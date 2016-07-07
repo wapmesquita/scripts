@@ -11,10 +11,9 @@ alias gst='git status'
 alias mci='mvn clean install'
 alias mii='mvn install'
 alias mjr='mvn jetty:run'
+alias mcp='mvn clean package'
 
 alias off='sudo shutdown -h now'
 
-alias vpn-start='cd ~/vpn && sudo openvpn pele-udp-1194-walter.mesquita.ovpn'
 
-alias nbf-224='rdesktop 172.16.120.224 -d local -u walter -r clipboard:CLIPBOARD -g 1400x800 -k pt-br'
-
+docker-psrm='docker ps -a | cut -b 1-12 | xargs docker rm'
