@@ -16,4 +16,4 @@ alias mcp='mvn clean package'
 alias off='sudo shutdown -h now'
 
 
-docker-psrm='docker ps -a | cut -b 1-12 | xargs docker rm'
+alias docker-psrm='docker ps -a | cut -b 1-12 | xargs docker rm'
