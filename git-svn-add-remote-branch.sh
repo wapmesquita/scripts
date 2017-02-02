@@ -60,8 +60,8 @@ fi
 
 remote='svn-'$branch
 
-git config --add svn-remote.svn-$remote.url $svnPath
-git config --add svn-remote.svn-$remote.fetch :refs/remotes/$remote
+git config --add svn-remote.$remote.url $svnPath
+git config --add svn-remote.$remote.fetch :refs/remotes/$remote
 git svn fetch $remote -r $rev
 git checkout -b $branch $remote
 git svn rebase
