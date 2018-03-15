@@ -1,6 +1,7 @@
+export GRADLE_HOME="$HOME/opt/gradle"
 export MAVEN_HOME="$HOME/opt/maven"
 export JAVA_HOME="$HOME/opt/java"
-export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
+export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$GRADLE_HOME/bin:$PATH"
 
 alias export8787='export MAVEN_OPTS="$MAVEN_OPS -Xdebug -Xnoagent -Djava.compiler=NONE -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8787 -Xms512m -Xmx756m -XX:PermSize=256m -XX:MaxPermSize=512m -Dsun.rmi.dgc.client.gcInterval=3600000 -Dsun.rmi.dgc.server.gcInterval=360000"'
 
