@@ -8,19 +8,13 @@ if __name__ == "__main__":
 
     labels = {}
     lists = {}
-    csvlist = [['Lista', 'Atividade', 'Descricao', 'Url', 'Classificacao']]
-
-    for i in data['labels']:
-        labels[i['id']] = i
+    csvlist = [['Lista', 'Atividade', 'Descricao', 'Url']]
 
     for i in data['lists']:
         lists[i['id']] = i
 
     for c in data['cards']:
-        labels = ''
-        for l in c['labels']:
-            labels=labels+l['name']+';'
-        csvlist.append([lists[c['idList']]['name'], c['name'], c['desc'], c['shortUrl'], labels])
+        csvlist.append([lists[c['idList']]['name'], c['name'], c['desc'], c['shortUrl']])
 
     for row in csvlist:
         text = ''
