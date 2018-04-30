@@ -4,7 +4,7 @@ apt-get update
 
 #Install Tools
 
-apt-get install -y vim subversion git curl dropbox 
+apt-get install -y vim subversion git curl terminator
 
 #Install Docker     
 
@@ -25,7 +25,7 @@ add-apt-repository \
 
 apt-get update
 
-apt-get install docker-ce
+apt-get install -y docker-ce
 
 groupadd docker
 
