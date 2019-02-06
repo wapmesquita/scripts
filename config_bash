@@ -12,13 +12,12 @@ alias gaci='git add -A && git commit -m '
 alias gci='git add -A && git commit -m '
 alias gcip='git add -A && git commit && git pull'
 alias gst='git status'
+alias gfetch='git fetch --all --prune'
 ## Maven
 alias mci='mvn clean install'
-alias mii='mvn install'
-alias mjr='mvn jetty:run'
 alias mcp='mvn clean package'
 alias export8787='export MAVEN_OPTS="$MAVEN_OPS -Xdebug -Xnoagent -Djava.compiler=NONE -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8787 -Xms512m -Xmx756m -XX:PermSize=256m -XX:MaxPermSize=512m -Dsun.rmi.dgc.client.gcInterval=3600000 -Dsun.rmi.dgc.server.gcInterval=360000"'
 ## Docker
-alias docker-psrm='docker ps -a | cut -b 1-12 | xargs docker rm'
+alias docker-clean='docker system prune <<< y'
 ## AWS
 alias aws-login="eval $(aws ecr get-login --no-include-email --region us-east-1)"
