@@ -23,7 +23,7 @@ export GOROOT="$HOME/opt/go"
 export USER_PATH="$HOME/go/bin:$GOROOT/bin:$USER_PATH"
 
 ## OTHERS
-export TERRAFORM="$HOME/opt/terraform/terraform"
+export TERRAFORM="$HOME/opt/terraform"
 export USER_PATH="$TERRAFORM:$USER_PATH"
 
 #####################################################
