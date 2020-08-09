@@ -19,12 +19,16 @@ export JMETER_HOME="$HOME/opt/jmeter"
 export USER_PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$GRADLE_HOME/bin:$JMETER_HOME/bin"
 
 ## GO
-export GOROOT="$HOME/opt/go"
-export USER_PATH="$HOME/go/bin:$GOROOT/bin:$USER_PATH"
+# export GOROOT="$HOME/opt/go"
+# export USER_PATH="$HOME/go/bin:$GOROOT/bin:$USER_PATH"
 
-## OTHERS
-export TERRAFORM="$HOME/opt/terraform"
-export USER_PATH="$TERRAFORM:$USER_PATH"
+## TERRAFORM
+# export TERRAFORM="$HOME/opt/terraform"
+# export USER_PATH="$TERRAFORM:$USER_PATH"
+
+## UTILS
+export UTILS="$HOME/opt/utils"
+export USER_PATH="$UTILS:$USER_PATH"
 
 #####################################################
 ## Config PATH
