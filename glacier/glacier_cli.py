@@ -7,6 +7,7 @@ import hashlib
 from botocore.utils import calculate_tree_hash
 from datetime import datetime, timedelta
 import yaml
+import time
 
 CACHE_FILE = '.cache.yml'
 
@@ -340,6 +341,19 @@ def ls(ctx):
         return
     click.echo(f"Found InventoryRetrieval job with ID: {job_id}")
     retrieve_files_from_job(ctx, vault_name, job_id)
+
+    # Save the result into a log file
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    log_filename = f"{ctx.obj['region']}-{vault_name}-files-{timestamp}.log"
+    with open(log_filename, 'w') as log_file:
+        session = boto3.Session(profile_name=ctx.obj['profile'])
+        client = session.client('glacier', region_name=ctx.obj['region'])
+        response = client.get_job_output(vaultName=vault_name, jobId=job_id)
+        inventory = json.loads(response['body'].read())
+        log_file.write(json.dumps(inventory, indent=2))
+        for archive in inventory['ArchiveList']:
+            click.echo(f"Archive ID: {archive['ArchiveId']}, Size: {archive['Size']}, Description: {archive.get('ArchiveDescription', 'N/A')}")
+    click.echo(f"Response saved to {log_filename}")
 
 def choose_job(ctx, job_type):
     """Prompt the user to choose a job of a specific type from the last month."""
