@@ -33,8 +33,9 @@ def clear_cache():
 @click.group(invoke_without_command=True)
 @click.option('--verbose', is_flag=True, help="Show detailed responses.")
 @click.option('--clear-cache', is_flag=True, help="Clear the cache.")
+@click.option('--output-dir', type=click.Path(), default='./outputs', help="Directory to save output files.")
 @click.pass_context
-def cli(ctx, verbose, clear_cache):
+def cli(ctx, verbose, clear_cache, output_dir):
     """A CLI to interact with AWS S3 Glacier."""
     if clear_cache:
         clear_cache()
@@ -47,6 +48,9 @@ def cli(ctx, verbose, clear_cache):
 
     ctx.ensure_object(dict)
     ctx.obj['verbose'] = verbose
+    ctx.obj['output_dir'] = output_dir
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     cache = load_cache()
     if 'region' in cache:
@@ -135,7 +139,8 @@ def upload_multipart(ctx, file_path):
     checksum = hashlib.sha256()
 
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-    log_filename = f"{file_name}_{timestamp}_{vault_name}.log"
+    output_dir = ctx.obj['output_dir']
+    log_filename = os.path.join(output_dir, f"{file_name}_{timestamp}_{vault_name}.log")
 
     result_obj = {}
 
@@ -178,7 +183,7 @@ def upload_multipart(ctx, file_path):
 
         except Exception as e:
             # Abort multipart upload in case of error
-            result_obj['abort_multipart_upload'] = abort_upload(ctx, vault_name, upload_id)
+            result_obj['abort_multipart_upload'] = upload_abort(ctx, vault_name, upload_id)
             verbose_log(ctx, result_obj['abort_multipart_upload'])
             click.echo(f"Upload aborted due to error: {str(e)}")
     finally:
@@ -201,7 +206,8 @@ def upload(ctx, file_path):
     file_size = os.path.getsize(file_path)
 
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-    log_filename = f"{file_name}_{timestamp}_{vault_name}.log"
+    output_dir = ctx.obj['output_dir']
+    log_filename = os.path.join(output_dir, f"{file_name}_{timestamp}_{vault_name}.log")
 
     result_obj = {}
 
@@ -240,6 +246,8 @@ def download(ctx, file_path):
     job_id = choose_job(ctx, 'ArchiveRetrieval')
     if not job_id:
         return
+    output_dir = ctx.obj['output_dir']
+    file_path = os.path.join(output_dir, file_path)
     retrieve_files_from_job(ctx, vault_name, job_id, file_path)
 
 @cli.command()
@@ -344,7 +352,8 @@ def ls(ctx):
 
     # Save the result into a log file
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-    log_filename = f"{ctx.obj['region']}-{vault_name}-files-{timestamp}.log"
+    output_dir = ctx.obj['output_dir']
+    log_filename = os.path.join(output_dir, f"{ctx.obj['region']}-{vault_name}-files-{timestamp}.log")
     with open(log_filename, 'w') as log_file:
         session = boto3.Session(profile_name=ctx.obj['profile'])
         client = session.client('glacier', region_name=ctx.obj['region'])
