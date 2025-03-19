@@ -6,22 +6,78 @@ import os
 import hashlib
 from botocore.utils import calculate_tree_hash
 from datetime import datetime, timedelta
+import yaml
+
+CACHE_FILE = '.cache.yml'
+
+def load_cache():
+    if os.path.exists(CACHE_FILE):
+        with open(CACHE_FILE, 'r') as f:
+            return yaml.safe_load(f)
+    return {}
+
+def save_cache(data):
+    with open(CACHE_FILE, 'w') as f:
+        yaml.safe_dump(data, f)
+
+def store_in_cache(key, value):
+    cache = load_cache()
+    cache[key] = value
+    save_cache(cache)
+
+def clear_cache():
+    if os.path.exists(CACHE_FILE):
+        os.remove(CACHE_FILE)
 
 @click.group(invoke_without_command=True)
+@click.option('--verbose', is_flag=True, help="Show detailed responses.")
+@click.option('--clear-cache', is_flag=True, help="Clear the cache.")
 @click.pass_context
-def cli(ctx):
+def cli(ctx, verbose, clear_cache):
     """A CLI to interact with AWS S3 Glacier."""
+    if clear_cache:
+        clear_cache()
+        click.echo("Cache cleared.")
+        return
+
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
         return
+
     ctx.ensure_object(dict)
-    ctx.obj['region'] = click.prompt("Enter AWS region", default='us-east-1')
+    ctx.obj['verbose'] = verbose
+
+    cache = load_cache()
+    if 'region' in cache:
+        ctx.obj['region'] = cache['region']
+    else:
+        ctx.obj['region'] = 'us-east-1'
+
+    ctx.obj['region'] = click.prompt("Enter AWS region", default=ctx.obj['region'])
+    store_in_cache('region', ctx.obj['region'])
+
+    if 'profile' in cache:
+        ctx.obj['profile'] = cache['profile']
+    else:
+        ctx.obj['profile'] = click.prompt("Enter AWS profile", default='default')
+        store_in_cache('profile', ctx.obj['profile'])
+
     ctx.obj['vault_name'] = choose_vault(ctx)
+
+def verbose_log(ctx, obj):
+    """Print verbose log if verbose flag is set."""
+    if ctx.obj['verbose']:
+        try:
+            click.echo(json.dumps(obj, indent=2))
+        except TypeError:
+            click.echo(str(obj))
 
 def choose_vault(ctx):
     """Prompt the user to choose a vault."""
-    client = boto3.client('glacier', region_name=ctx.obj['region'])
+    session = boto3.Session(profile_name=ctx.obj['profile'])
+    client = session.client('glacier', region_name=ctx.obj['region'])
     response = client.list_vaults()
+    verbose_log(ctx, response)
     vaults = response.get('VaultList', [])
     if not vaults:
         click.echo("No vaults found.")
@@ -43,7 +99,8 @@ def jobs(ctx):
     vault_name = ctx.obj['vault_name']
     if not vault_name:
         return
-    client = boto3.client('glacier', region_name=ctx.obj['region'])
+    session = boto3.Session(profile_name=ctx.obj['profile'])
+    client = session.client('glacier', region_name=ctx.obj['region'])
     response = client.list_jobs(vaultName=vault_name)
     click.echo(json.dumps(response, indent=2))
 
@@ -55,7 +112,8 @@ def upload_abort(ctx):
     if not vault_name:
         return
     upload_id = click.prompt("Enter upload ID")
-    client = boto3.client('glacier', region_name=ctx.obj['region'])
+    session = boto3.Session(profile_name=ctx.obj['profile'])
+    client = session.client('glacier', region_name=ctx.obj['region'])
     response = client.abort_multipart_upload(vaultName=vault_name, uploadId=upload_id)
     click.echo(json.dumps(response, indent=2))
     return response
@@ -69,7 +127,8 @@ def upload_multipart(ctx, file_path):
     if not vault_name:
         return
     file_name = os.path.basename(file_path)
-    client = boto3.client('glacier', region_name=ctx.obj['region'])
+    session = boto3.Session(profile_name=ctx.obj['profile'])
+    client = session.client('glacier', region_name=ctx.obj['region'])
     file_size = os.path.getsize(file_path)
     part_size = 8 * 1024 * 1024  # 8 MB
     checksum = hashlib.sha256()
@@ -89,6 +148,7 @@ def upload_multipart(ctx, file_path):
         response = client.initiate_multipart_upload(vaultName=vault_name, archiveDescription=file_name, partSize=str(part_size))
         result_obj['initiate_multipart_upload'] = response
         result_obj['parts'] = {}
+        verbose_log(ctx, response)
 
         upload_id = response['uploadId']
 
@@ -118,6 +178,7 @@ def upload_multipart(ctx, file_path):
         except Exception as e:
             # Abort multipart upload in case of error
             result_obj['abort_multipart_upload'] = abort_upload(ctx, vault_name, upload_id)
+            verbose_log(ctx, result_obj['abort_multipart_upload'])
             click.echo(f"Upload aborted due to error: {str(e)}")
     finally:
         with open(log_filename, 'w') as log_file:
@@ -134,7 +195,8 @@ def upload(ctx, file_path):
     if not vault_name:
         return
     file_name = os.path.basename(file_path)
-    client = boto3.client('glacier', region_name=ctx.obj['region'])
+    session = boto3.Session(profile_name=ctx.obj['profile'])
+    client = session.client('glacier', region_name=ctx.obj['region'])
     file_size = os.path.getsize(file_path)
 
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
@@ -186,7 +248,8 @@ def inventory_retrieval(ctx):
     vault_name = ctx.obj['vault_name']
     if not vault_name:
         return
-    client = boto3.client('glacier', region_name=ctx.obj['region'])
+    session = boto3.Session(profile_name=ctx.obj['profile'])
+    client = session.client('glacier', region_name=ctx.obj['region'])
     inventory_job = client.initiate_job(
         vaultName=vault_name,
         jobParameters={
@@ -194,6 +257,8 @@ def inventory_retrieval(ctx):
         }
     )
     click.echo(f"Initiated inventory retrieval job for vault {vault_name}. Job ID: {inventory_job['jobId']}")
+    if ctx.obj['verbose']:
+        click.echo(json.dumps(inventory_job, indent=2))
 
 @cli.command()
 @click.pass_context
@@ -217,13 +282,16 @@ def vault_cleanup(ctx):
         click.echo("Vault name does not match. Aborting cleanup.")
         return
 
-    client = boto3.client('glacier', region_name=ctx.obj['region'])
+    session = boto3.Session(profile_name=ctx.obj['profile'])
+    client = session.client('glacier', region_name=ctx.obj['region'])
     response = client.describe_job(vaultName=vault_name, jobId=job_id)
     if response['Action'] == 'InventoryRetrieval' and response['StatusCode'] == 'Succeeded':
         inventory = json.loads(response['InventoryRetrievalParameters']['Inventory'])
         for archive in inventory['ArchiveList']:
             client.delete_archive(vaultName=vault_name, archiveId=archive['ArchiveId'])
             click.echo(f"Deleted archive {archive['ArchiveId']} from vault {vault_name}")
+        if ctx.obj['verbose']:
+            click.echo(json.dumps(response, indent=2))
     else:
         click.echo(f"Job {job_id} is not an inventory retrieval job or has not succeeded.")
 
@@ -235,7 +303,8 @@ def delete(ctx, archive_id):
     vault_name = ctx.obj['vault_name']
     if not vault_name:
         return
-    client = boto3.client('glacier', region_name=ctx.obj['region'])
+    session = boto3.Session(profile_name=ctx.obj['profile'])
+    client = session.client('glacier', region_name=ctx.obj['region'])
     response = client.delete_archive(vaultName=vault_name, archiveId=archive_id)
     click.echo(json.dumps(response, indent=2))
 
@@ -247,7 +316,8 @@ def archive_retrieval(ctx, archive_id):
     vault_name = ctx.obj['vault_name']
     if not vault_name:
         return
-    client = boto3.client('glacier', region_name=ctx.obj['region'])
+    session = boto3.Session(profile_name=ctx.obj['profile'])
+    client = session.client('glacier', region_name=ctx.obj['region'])
     response = client.initiate_job(
         vaultName=vault_name,
         jobParameters={
@@ -256,7 +326,7 @@ def archive_retrieval(ctx, archive_id):
         }
     )
     click.echo(f"Initiated archive retrieval job for archive {archive_id} in vault {vault_name}. Job ID: {response['jobId']}")
-    click.echo(json.dumps(response, indent=2))
+    verbose_log(ctx, response)
 
 @cli.command()
 @click.pass_context
@@ -274,9 +344,11 @@ def ls(ctx):
 def choose_job(ctx, job_type):
     """Prompt the user to choose a job of a specific type from the last month."""
     vault_name = ctx.obj['vault_name']
-    client = boto3.client('glacier', region_name=ctx.obj['region'])
+    session = boto3.Session(profile_name=ctx.obj['profile'])
+    client = session.client('glacier', region_name=ctx.obj['region'])
     one_month_ago = datetime.now() - timedelta(days=30)
     response = client.list_jobs(vaultName=vault_name)
+    verbose_log(ctx, response)
     jobs = [
         job for job in response['JobList']
         if job['Action'] == job_type and datetime.strptime(job['CreationDate'], '%Y-%m-%dT%H:%M:%S.%fZ') > one_month_ago
@@ -300,9 +372,11 @@ def choose_job(ctx, job_type):
 def get_most_recent_job(ctx, job_type):
     """Get the most recent job of a specific type from the last month."""
     vault_name = ctx.obj['vault_name']
-    client = boto3.client('glacier', region_name=ctx.obj['region'])
+    session = boto3.Session(profile_name=ctx.obj['profile'])
+    client = session.client('glacier', region_name=ctx.obj['region'])
     one_month_ago = datetime.now() - timedelta(days=30)
     response = client.list_jobs(vaultName=vault_name)
+    verbose_log(ctx, response)
     jobs = [
         job for job in response['JobList']
         if job['Action'] == job_type and datetime.strptime(job['CreationDate'], '%Y-%m-%dT%H:%M:%S.%fZ') > one_month_ago
@@ -317,8 +391,10 @@ def get_most_recent_job(ctx, job_type):
 
 def retrieve_files_from_job(ctx, vault_name, job_id, file_path=None):
     """Retrieve files from a selected job."""
-    client = boto3.client('glacier', region_name=ctx.obj['region'])
+    session = boto3.Session(profile_name=ctx.obj['profile'])
+    client = session.client('glacier', region_name=ctx.obj['region'])
     response = client.get_job_output(vaultName=vault_name, jobId=job_id)
+    verbose_log(ctx, response)
     if file_path:
         with open(file_path, 'wb') as f:
             f.write(response['body'].read())
@@ -330,3 +406,4 @@ def retrieve_files_from_job(ctx, vault_name, job_id, file_path=None):
 
 if __name__ == '__main__':
     cli(obj={})
+    click.echo("Goodbye!")
