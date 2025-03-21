@@ -34,8 +34,9 @@ def clear_cache():
 @click.option('--verbose', is_flag=True, help="Show detailed responses.")
 @click.option('--clear-cache', is_flag=True, help="Clear the cache.")
 @click.option('--output-dir', type=click.Path(), default='./outputs', help="Directory to save output files.")
+@click.option('--vault-name', type=str, help="Name of the Glacier vault.")
 @click.pass_context
-def cli(ctx, verbose, clear_cache, output_dir):
+def cli(ctx, verbose, clear_cache, output_dir, vault_name):
     """A CLI to interact with AWS S3 Glacier."""
     if clear_cache:
         clear_cache()
@@ -67,7 +68,10 @@ def cli(ctx, verbose, clear_cache, output_dir):
         ctx.obj['profile'] = click.prompt("Enter AWS profile", default='default')
         store_in_cache('profile', ctx.obj['profile'])
 
-    ctx.obj['vault_name'] = choose_vault(ctx)
+    if vault_name:
+        ctx.obj['vault_name'] = vault_name
+    else:
+        ctx.obj['vault_name'] = choose_vault(ctx)
 
 def verbose_log(ctx, obj):
     """Print verbose log if verbose flag is set."""
@@ -363,6 +367,19 @@ def ls(ctx):
         for archive in inventory['ArchiveList']:
             click.echo(f"Archive ID: {archive['ArchiveId']}, Size: {archive['Size']}, Description: {archive.get('ArchiveDescription', 'N/A')}")
     click.echo(f"Response saved to {log_filename}")
+
+@cli.command()
+@click.pass_context
+def create_vault(ctx):
+    """Create a new Glacier vault."""
+    vault_name = ctx.obj['vault_name']
+    if not vault_name:
+        return
+    session = boto3.Session(profile_name=ctx.obj['profile'])
+    client = session.client('glacier', region_name=ctx.obj['region'])
+    response = client.create_vault(vaultName=vault_name)
+    click.echo(f"Vault {vault_name} created successfully.")
+    verbose_log(ctx, response)
 
 def choose_job(ctx, job_type):
     """Prompt the user to choose a job of a specific type from the last month."""
